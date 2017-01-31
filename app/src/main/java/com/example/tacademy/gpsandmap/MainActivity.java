@@ -3,6 +3,8 @@ package com.example.tacademy.gpsandmap;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
@@ -14,6 +16,9 @@ import android.util.Log;
 import android.widget.Toast;
 
 import com.squareup.otto.Subscribe;
+
+import java.util.List;
+import java.util.Locale;
 
 import cn.pedant.SweetAlert.SweetAlertDialog;
 
@@ -156,11 +161,93 @@ public class MainActivity extends AppCompatActivity {
         startService(intent);
     }
 
-    //GPS 최신 갱신 내용 수신
+    boolean flag;
+    // GPS 최신 갱신 내용 수신
     @Subscribe
     public void FinishLoad(Location location) {
         Log.i("GPS", "새로운위치 정보 : " + location.getLatitude() + "," + location.getLongitude());
         Toast.makeText(this, "새로운위치 정보 : " + location.getLatitude() + "," + location.getLongitude(), Toast.LENGTH_SHORT).show();
+        // 주소 획득
+        getAddress(location);
+
+        if (!flag) {    // 위치 정보가 한번이라도 왔다는 뜻
+            flag = true;
+            Intent intent = new Intent(this, MapsActivity.class);
+            startActivity(intent);
+        }
+    }
+
+    // GPS를 입력받으면 주소 획득
+    public void getAddress(Location location) {
+        if (location != null) {
+            getAddress(location.getLatitude(), location.getLongitude());
+        }
+    }
+    public void getAddress(double lat, double lng) {
+        Geocoder geocoder = new Geocoder(this, Locale.KOREA);
+        List<Address> addressList = null;
+        try {
+            // 1은 결과 개수의 MAX
+            addressList = geocoder.getFromLocation(lat, lng, 1);
+            if (addressList != null && addressList.size() > 0) {
+                // 주소 정보 1개 이상 획득이면
+                for (Address address : addressList) {
+                    Log.i("GPS", address.toString() + address.getThoroughfare()); //getThoroughfare 동단위 정보
+                }
+                // 새로운위치 정보 : 37.4663367,126.9605719
+                // Address[
+                // addressLines=[0:"대한민국 서울특별시 관악구 낙성대동 산4-8"],
+                // feature=산4-8,
+                // admin=서울특별시,
+                // sub-admin=null,
+                // locality=관악구,
+                // thoroughfare=낙성대동,
+                // postalCode=null,
+                // countryCode=KR,
+                // countryName=대한민국,
+                // hasLatitude=true,
+                // latitude=37.4651426,
+                // hasLongitude=true,
+                // longitude=126.959815,
+                // phone=null,url=null,extras=null]
+
+                //37.4841668,126.9536859,17
+            } else {
+                // 결과 없음
+                Log.i("GPS", "결과 없음");
+            }
+        } catch (Exception e) {
+            Log.i("GPS", "예외 상황");
+        }
+        Log.i("GPS", "거리" + distance(lat, lng, 37.4841668, 126.9536859, 'K'));
+    }
+
+    // 거리 계산 => 두 개의 포인트가 필요(내위치, 스팟)
+    public double distance(Location myLocation, Location youLocation, char unit) {
+        return distance(myLocation.getLatitude(), myLocation.getLongitude(),
+                youLocation.getLatitude(), youLocation.getLongitude(), unit);
+    }
+    public double distance(double lat1, double lng1, double lat2, double lng2, char unit) {
+        double theta = lng2 - lng1;
+        double dist =
+                Math.sin(deg2rad(lat1)) * Math.sin(deg2rad(lat2)) +
+                        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.cos(deg2rad(theta));
+        dist = Math.acos(dist);
+        dist = rad2deg(dist);
+        dist = dist * 60 * 1.1515;  // Miles
+        if (unit == 'K') {
+            dist = dist * 1.609344;   // Mile -> km 환산
+        } else if (unit == 'N') {
+            dist = dist * 0.8684; // Mile (Nautal Miles)
+        }
+        return dist;
+    }
+    public double deg2rad(double deg) {
+        return (deg * Math.PI / 180.0);
+    }
+    public double rad2deg(double rad) {
+        return (rad * Math.PI * 180.0);
     }
 }
+
 
